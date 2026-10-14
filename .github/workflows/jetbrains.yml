@@ -1,0 +1,58 @@
+# Builds and checks the JetBrains fork flavor of ModelContextProtocol.Core; see jetbrains/README.md.
+# The package it uploads is unsigned. The signed package comes from the JetBrains TeamCity build, which runs the same scripts.
+name: JetBrains fork
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: ["jetbrains"]
+
+  pull_request:
+    branches: ["jetbrains"]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        # The runtimes the JetBrains main solution runs the package on: .NET 10 everywhere, and .NET Framework on Windows.
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: 📥 Clone the repo
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    # No .NET setup step: the scripts bootstrap their pinned SDK through jetbrains/dotnet-sdk.cmd.
+    - name: 📦 Build the package
+      run: jetbrains/build.sh all
+
+    - name: 🧪 Check on .NET 10
+      run: jetbrains/verify.sh dotnet
+
+    - name: 🧪 Check on .NET Framework
+      if: runner.os == 'Windows'
+      run: jetbrains/verify.sh direct
+
+    - name: 📤 Upload the unsigned package
+      if: runner.os == 'Linux'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: package-unsigned
+        path: artifacts/jetbrains/packages/**
+
+    - name: 📤 Upload the logs
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: logs-${{ matrix.os }}
+        path: artifacts/jetbrains/*.log
