@@ -1,0 +1,3 @@
+# dotnet-sdk.cmd is a shell script and a cmd script in one file, and its shell half fails on CRLF.
+# The JetBrains monorepo keeps it unconverted, so this does too, over the root "*.cmd text eol=crlf".
+dotnet-sdk.cmd -text

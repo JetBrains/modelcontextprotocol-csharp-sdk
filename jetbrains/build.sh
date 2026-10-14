@@ -8,9 +8,10 @@
 # The lock is jetbrains/lock/MainSolutionPackageVersions.subset.xml; JB_PACKAGE_LOCK names another, as snapshot-lock.sh does with the full one.
 # Packages land in artifacts/jetbrains/packages.
 # Runs under Git Bash on Windows too.
+# Needs no .NET installed: jetbrains/sdk.sh bootstraps the SDK unless JB_DOTNET names one.
 set -euo pipefail
-# Git Bash paths are POSIX; dotnet.exe takes them in Windows form, which cygpath gives.
-native() { if command -v cygpath > /dev/null; then cygpath -w "$1"; else printf '%s' "$1"; fi; }
+# shellcheck source-path=SCRIPTDIR source=sdk.sh
+source "$(dirname "$0")/sdk.sh"
 step=$1; shift
 fork=$(cd "$(dirname "$0")" && pwd)
 root=$(dirname "$fork")
@@ -36,5 +37,5 @@ for proj in "${projects[@]}"; do
   )
   if [ "$step" != restore ]; then args+=(-c Release); fi
   if [ "$step" = all ] || [ "$step" = pack ]; then args+=(-o "$(native "$out/packages")"); fi
-  dotnet "${command[@]}" "$(native "$root/$proj")" "${args[@]}" "$@"
+  "$dotnet" "${command[@]}" "$(native "$root/$proj")" "${args[@]}" "$@"
 done
