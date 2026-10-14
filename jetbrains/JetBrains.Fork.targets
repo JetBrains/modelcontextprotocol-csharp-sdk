@@ -1,0 +1,46 @@
+<Project>
+  <!--
+    JetBrains fork overlay: builds the packable SDK projects for netstandard2.0 only, against the package versions of the JetBrains main solution.
+    jetbrains/build.sh hooks it in through CustomAfterMicrosoftCommonTargets and CustomAfterMicrosoftCommonCrossTargetingTargets, so no upstream file carries a fork edit.
+    jetbrains/README.md lists each change and when it can go.
+  -->
+
+  <PropertyGroup>
+    <JbForkDir>$(MSBuildThisFileDirectory)</JbForkDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- The analyzer runs inside the consumer's compiler, not in its process, so it keeps the upstream Roslyn pins rather than the runtime lock. -->
+    <JbIsLockedProject Condition="'$(MSBuildProjectName)' != 'ModelContextProtocol.Analyzers'">true</JbIsLockedProject>
+  </PropertyGroup>
+
+  <!-- The main solution lock file is MSBuild-shaped: one PackageLock item per package, its version in the Version metadata. -->
+  <Import Project="$(JbPackageLockFile)" Condition="'$(JbIsLockedProject)' == 'true'" />
+  <Import Project="$(JbForkDir)LockAdditions.props" Condition="'$(JbIsLockedProject)' == 'true'" />
+
+  <ItemGroup Condition="'$(JbIsLockedProject)' == 'true'">
+    <!-- Every package the lock knows takes the lock version, whatever upstream pins and whatever arrives transitively. -->
+    <PackageVersion Remove="@(PackageLock)" />
+    <PackageVersion Include="@(PackageLock)" />
+    <!-- The SDK defines this one implicitly, and central package management refuses a PackageVersion for it (NU1009). -->
+    <PackageVersion Remove="NETStandard.Library" />
+    <!-- The .NET 8+ SDK carries Source Link itself; the package only drags build-time dependencies past the lock (System.IO.Hashing 10 for Source Link 10). -->
+    <PackageReference Remove="Microsoft.SourceLink.GitHub" />
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(JbIsLockedProject)' == 'true'">
+    <!-- Pins transitive packages to the lock too, so the compiled-against assembly versions are exactly the ones the main solution ships. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(JbIsLockedProject)' == 'true'">
+    <!-- Upstream doc comments cref System.Text.Json 9 members such as JsonSerializerOptions.AllowOutOfOrderMetadataProperties; nothing but the link is lost. -->
+    <NoWarn>$(NoWarn);CS1574</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(JbIsLockedProject)' == 'true'">
+    <!-- Advisories against lock versions are the main solution's to fix, so each one is listed here by name rather than failing the fork build. -->
+    <!-- CVE-2026-26127, denial of service in Microsoft.Bcl.Memory 9.0.0 to 9.0.13; the lock has 9.0.0, and 9.0.14 fixes it. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-73j8-2gch-69rq" />
+  </ItemGroup>
+</Project>
