@@ -33,6 +33,25 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
+  <PropertyGroup Condition="('$(JbIsLockedProject)' == 'true') and ('$(IsPackable)' == 'true')">
+    <!-- Own package identity: the main solution lock is keyed by package id, and an upstream id would also collide in package caches and feeds. -->
+    <JbUpstreamPackageId>$(PackageId)</JbUpstreamPackageId>
+    <PackageId>JetBrains.$(JbUpstreamPackageId)</PackageId>
+    <JbForkRevision Condition="'$(JbForkRevision)' == ''">1</JbForkRevision>
+    <!-- A stable version, as a prerelease cannot be a dependency of a release package, with four components that are all nonzero, since NuGet normalizes a zero away in some places and not others. -->
+    <!-- Major and minor are upstream's; the third is upstream's patch plus one, so a .0 release stays nonzero; the fourth is the fork revision. -->
+    <PackageVersion>$([System.Version]::Parse('$(VersionPrefix)').Major).$([System.Version]::Parse('$(VersionPrefix)').Minor).$([MSBuild]::Add($([System.Version]::Parse('$(VersionPrefix)').Build), 1)).$(JbForkRevision)</PackageVersion>
+    <!-- The assembly version stays upstream's, so the assembly binds where the upstream one would; the file version tells the builds apart. -->
+    <FileVersion>$(PackageVersion)</FileVersion>
+    <!-- Package validation compares against the upstream package of the same version, so every fork build doubles as an API diff against it. -->
+    <PackageValidationBaselineName>$(JbUpstreamPackageId)</PackageValidationBaselineName>
+    <PackageValidationBaselineVersion>$(VersionPrefix)</PackageValidationBaselineVersion>
+    <!-- Upstream's suppressions are against its own older baseline, so they never apply; the fork's file is written by -p:ApiCompatGenerateSuppressionFile=true once a diff needs one. -->
+    <JbCompatibilitySuppressionFile>$(JbForkDir)CompatibilitySuppressions.$(JbUpstreamPackageId).xml</JbCompatibilitySuppressionFile>
+    <CompatibilitySuppressionFilePath Condition="Exists('$(JbCompatibilitySuppressionFile)') or ('$(ApiCompatGenerateSuppressionFile)' == 'true')">$(JbCompatibilitySuppressionFile)</CompatibilitySuppressionFilePath>
+    <CompatibilitySuppressionFilePath Condition="!Exists('$(JbCompatibilitySuppressionFile)') and ('$(ApiCompatGenerateSuppressionFile)' != 'true')"></CompatibilitySuppressionFilePath>
+  </PropertyGroup>
+
   <PropertyGroup Condition="'$(JbIsLockedProject)' == 'true'">
     <!-- Upstream doc comments cref System.Text.Json 9 members such as JsonSerializerOptions.AllowOutOfOrderMetadataProperties; nothing but the link is lost. -->
     <NoWarn>$(NoWarn);CS1574</NoWarn>
@@ -43,4 +62,8 @@
     <!-- CVE-2026-26127, denial of service in Microsoft.Bcl.Memory 9.0.0 to 9.0.13; the lock has 9.0.0, and 9.0.14 fixes it. -->
     <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-73j8-2gch-69rq" />
   </ItemGroup>
+
+  <Target Name="JbCheckPackageVersion" BeforeTargets="GenerateNuspec" Condition="('$(JbIsLockedProject)' == 'true') and ('$(IsPackable)' == 'true')">
+    <Error Condition="$(PackageVersion.Split('.').Length) != 4 or $(PackageVersion.Contains('-')) or $(PackageVersion.StartsWith('0.')) or $(PackageVersion.Contains('.0.')) or $(PackageVersion.EndsWith('.0'))" Text="The fork package version $(PackageVersion), made from upstream $(VersionPrefix), must be stable and have four nonzero components." />
+  </Target>
 </Project>
