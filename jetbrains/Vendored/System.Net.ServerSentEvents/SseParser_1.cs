@@ -502,7 +502,20 @@ namespace System.Net.ServerSentEvents
             ShiftOrGrowLineBufferIfNecessary();
 
             int offset = _lineOffset + _lineLength;
-            int bytesRead = await _stream.ReadAsync(_lineBuffer.AsMemory(offset), cancellationToken).ConfigureAwait(false);
+            // JetBrains fork: a read on a .NET Framework response stream ignores its token, so a stream the server keeps open never let a cancelled enumeration end.
+            // Disposing the stream on cancellation makes that read return, and the failure it returns with surfaces as the cancellation it is.
+            int bytesRead;
+            using (cancellationToken.Register(static stream => ((Stream)stream!).Dispose(), _stream))
+            {
+                try
+                {
+                    bytesRead = await _stream.ReadAsync(_lineBuffer.AsMemory(offset), cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellationToken);
+                }
+            }
 
             if (bytesRead > 0)
             {

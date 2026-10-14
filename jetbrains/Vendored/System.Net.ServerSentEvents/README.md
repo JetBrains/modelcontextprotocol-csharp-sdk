@@ -3,6 +3,7 @@ Parser half of `System.Net.ServerSentEvents` from dotnet/runtime v10.0.0 (commit
 Every published version of the package needs `Microsoft.Bcl.AsyncInterfaces` 9 or newer, above the main solution lock.
 
 Changes against the runtime files, each marked `// JetBrains fork:` where it is:
+- `SseParser<T>.FillLineBufferAsync` disposes the stream when its token is cancelled. A .NET Framework response stream ignores the token of a pending read, so without this an SSE client whose server keeps the stream open could never be closed. The runtime's own net462 build has the same gap.
 - `SseParser`, `SseParser<T>` and `SseItemParser<T>` are internal; `SseItem<T>` stays public, because the public `ISseEventStreamReader`/`ISseEventStreamWriter` expose it.
 - `Helpers.cs` is left out: upstream's `src/Common/ServerSentEvents/SseEventWriterHelpers.cs` is its copy.
 - `SR.cs` is fork-owned and stands in for the runtime resource strings.
