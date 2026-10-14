@@ -11,16 +11,18 @@ using ModelContextProtocol.Server;
 //   server                stdio MCP server built on the fork
 //   stdio <host-command>  client: starts this assembly's server mode through <host-command> and talks to it; "direct" starts the executable itself, as .NET Framework runs it
 //   http <url> <mode>     client: talks to an MCP server over HTTP, mode StreamableHttp or Sse
+// The server mode speaks MCP on its stdout, so it reports on stderr; the client modes report on stdout, since a CI step can read any stderr line as an error.
+TextWriter report = (args[0] == "server") ? Console.Error : Console.Out;
 int failures = 0;
 void Check(bool isOk, string what)
 {
-    Console.Error.WriteLine($"{(isOk ? "PASS" : "FAIL")} {what}");
+    report.WriteLine($"{(isOk ? "PASS" : "FAIL")} {what}");
     if(!isOk) failures++;
 }
 
 string runtime = System.Runtime.InteropServices.RuntimeInformation.FrameworkDescription;
 string stjVersion = typeof(JsonSerializer).Assembly.GetName().Version!.ToString();
-Console.Error.WriteLine($"runtime={runtime} System.Text.Json={stjVersion} mode={args[0]}");
+report.WriteLine($"runtime={runtime} System.Text.Json={stjVersion} mode={args[0]}");
 
 switch(args[0])
 {
@@ -76,7 +78,7 @@ switch(args[0])
             var level = new TaskCompletionSource<LoggingLevel>(TaskCreationOptions.RunContinuationsAsynchronously);
             await using(client.RegisterNotificationHandler(NotificationMethods.LoggingMessageNotification, (notification, _) =>
             {
-                Console.Error.WriteLine($"     notification params: {notification.Params?.ToJsonString()}");
+                report.WriteLine($"     notification params: {notification.Params?.ToJsonString()}");
                 level.TrySetResult(JsonSerializer.Deserialize<LoggingMessageNotificationParams>(notification.Params, McpJsonUtilities.DefaultOptions)!.Level);
                 return default;
             }))
@@ -104,5 +106,5 @@ switch(args[0])
         break;
 }
 
-Console.Error.WriteLine(failures == 0 ? "ALL PASS" : $"{failures} FAILED");
+report.WriteLine(failures == 0 ? "ALL PASS" : $"{failures} FAILED");
 return failures == 0 ? 0 : 1;
