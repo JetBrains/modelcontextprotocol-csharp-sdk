@@ -1,5 +1,6 @@
 #nullable enable
 
+using System.Net.Http;
 using System.Text.Json;
 using ModelContextProtocol;
 using ModelContextProtocol.Client;
@@ -10,7 +11,7 @@ using ModelContextProtocol.Server;
 //   json                  enum wire names through McpJsonUtilities.DefaultOptions
 //   server                stdio MCP server built on the fork
 //   stdio <host-command>  client: starts this assembly's server mode through <host-command> and talks to it; "direct" starts the executable itself, as .NET Framework runs it
-//   http <url> <mode>     client: talks to an MCP server over HTTP, mode StreamableHttp or Sse
+//   http <url> <mode> [deaf]  client: talks to an MCP server over HTTP, mode StreamableHttp or Sse; "deaf" gives it response streams that ignore cancellation
 // The server mode speaks MCP on its stdout, so it reports on stderr; the client modes report on stdout, since a CI step can read any stderr line as an error.
 TextWriter report = (args[0] == "server") ? Console.Error : Console.Out;
 int failures = 0;
@@ -94,17 +95,64 @@ switch(args[0])
         break;
 
     case "http":
-        var httpTransport = new HttpClientTransport(new HttpClientTransportOptions { Endpoint = new Uri(args[1]), TransportMode = (HttpTransportMode)Enum.Parse(typeof(HttpTransportMode), args[2]) });
+        bool isDeaf = (args.Length > 3) && (args[3] == "deaf");
+        string over = isDeaf ? $"{args[2]} with cancellation-deaf streams" : args[2];
+        var httpOptions = new HttpClientTransportOptions { Endpoint = new Uri(args[1]), TransportMode = (HttpTransportMode)Enum.Parse(typeof(HttpTransportMode), args[2]) };
+        HttpClientTransport httpTransport = isDeaf ? new HttpClientTransport(httpOptions, new HttpClient(new CancellationDeafHandler()), ownsHttpClient: true) : new HttpClientTransport(httpOptions);
         await using(McpClient client = await McpClient.CreateAsync(httpTransport))
         {
-            Check(client.ServerInfo is not null, $"initialize over {args[2]}, server {client.ServerInfo?.Name}, protocol {client.NegotiatedProtocolVersion}");
+            Check(client.ServerInfo is not null, $"initialize over {over}, server {client.ServerInfo?.Name}, protocol {client.NegotiatedProtocolVersion}");
             IList<McpClientTool> tools = await client.ListToolsAsync();
             Check(tools.Any(tool => tool.Name == "echo"), $"tools: {string.Join(", ", tools.Select(tool => tool.Name))}");
             CallToolResult echo = await client.CallToolAsync("echo", new Dictionary<string, object?> { ["text"] = "hi" });
-            Check(echo.Content.OfType<TextContentBlock>().Single().Text == "http-echo:hi", $"call echo over {args[2]}");
+            Check(echo.Content.OfType<TextContentBlock>().Single().Text == "http-echo:hi", $"call echo over {over}");
         }
         break;
 }
 
 report.WriteLine(failures == 0 ? "ALL PASS" : $"{failures} FAILED");
 return failures == 0 ? 0 : 1;
+
+/// <summary>
+/// Hands out response streams whose reads ignore their cancellation token, as the network streams of .NET Framework do.
+/// <para>With it any runtime shows whether a client still closes while the server keeps a stream open, which only .NET Framework showed before.</para>
+/// </summary>
+sealed class CancellationDeafHandler() : DelegatingHandler(new HttpClientHandler())
+{
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        HttpResponseMessage response = await base.SendAsync(request, cancellationToken);
+        var deaf = new StreamContent(new CancellationDeafStream(await response.Content.ReadAsStreamAsync()));
+        foreach(KeyValuePair<string, IEnumerable<string>> header in response.Content.Headers)
+            deaf.Headers.TryAddWithoutValidation(header.Key, header.Value);
+        response.Content = deaf;
+        return response;
+    }
+}
+
+/// <summary>
+/// Reads from the wrapped stream without the caller's cancellation token; disposing it still ends a pending read, as closing a .NET Framework response stream does.
+/// </summary>
+sealed class CancellationDeafStream(Stream inner) : Stream
+{
+    public override bool CanRead => true;
+    public override bool CanSeek => false;
+    public override bool CanWrite => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override void Flush() { }
+    public override int Read(byte[] buffer, int offset, int count) => inner.Read(buffer, offset, count);
+    public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken) => inner.ReadAsync(buffer, offset, count, CancellationToken.None);
+#if NET
+    public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default) => inner.ReadAsync(buffer, CancellationToken.None);
+#endif
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+    protected override void Dispose(bool disposing)
+    {
+        if(disposing) inner.Dispose();
+        base.Dispose(disposing);
+    }
+}

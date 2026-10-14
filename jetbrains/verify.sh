@@ -8,6 +8,7 @@
 #     "direct" runs the net472 executable itself, which on Windows means .NET Framework.
 #   The dotnet of jetbrains/sdk.sh builds the checks and hosts the upstream HTTP server, so a JB_DOTNET must be a .NET 10 SDK.
 #   DOTNET_ROLL_FORWARD=LatestMajor in the environment runs the net8.0 build on the newest .NET instead.
+#   JB_CHECK_TIMEOUT sets the seconds each check may take, 120 by default; a client that cannot close shows as a timeout.
 # Checks per host: enum wire names, stdio client against the fork's own stdio server, and HTTP client against the upstream ASP.NET Core server over Streamable HTTP and legacy SSE.
 # Runs under Git Bash on Windows too, and needs no .NET installed: jetbrains/sdk.sh bootstraps the SDK unless JB_DOTNET names one.
 set -euo pipefail
@@ -44,7 +45,7 @@ for _ in $(seq 1 60); do curl -s -o /dev/null "http://127.0.0.1:$port/" && break
 
 failures=0
 # Each check gets its words as separate arguments, so a host path with spaces stays one argument.
-check() { if ! timeout 120 "${app[@]}" "$@"; then failures=$((failures + 1)); fi; }
+check() { if ! timeout ${JB_CHECK_TIMEOUT:-120} "${app[@]}" "$@"; then failures=$((failures + 1)); fi; }
 for host in "$@"; do
   if [ "$host" = dotnet ]; then host=$dotnet; fi
   case "$(basename "$host")" in
@@ -62,6 +63,9 @@ for host in "$@"; do
   fi
   check http "http://127.0.0.1:$port/" StreamableHttp
   check http "http://127.0.0.1:$port/sse" Sse
+  # Response streams that ignore cancellation, as those of .NET Framework do, show on any runtime that a client still closes.
+  check http "http://127.0.0.1:$port/" StreamableHttp deaf
+  check http "http://127.0.0.1:$port/sse" Sse deaf
 done
 echo "verify: $failures failed check run(s)"
 exit $((failures > 0))
