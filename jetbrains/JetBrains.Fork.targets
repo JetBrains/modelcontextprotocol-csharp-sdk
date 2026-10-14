@@ -57,6 +57,12 @@
     <NoWarn>$(NoWarn);CS1574</NoWarn>
   </PropertyGroup>
 
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'ModelContextProtocol.Core'">
+    <!-- Every System.Net.ServerSentEvents version needs Microsoft.Bcl.AsyncInterfaces 9 or newer, so the parser is compiled in from source instead. -->
+    <PackageReference Remove="System.Net.ServerSentEvents" />
+    <Compile Include="$(JbForkDir)Vendored\System.Net.ServerSentEvents\*.cs" Link="JetBrains\Vendored\%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(JbIsLockedProject)' == 'true'">
     <!-- Advisories against lock versions are the main solution's to fix, so each one is listed here by name rather than failing the fork build. -->
     <!-- CVE-2026-26127, denial of service in Microsoft.Bcl.Memory 9.0.0 to 9.0.13; the lock has 9.0.0, and 9.0.14 fixes it. -->
