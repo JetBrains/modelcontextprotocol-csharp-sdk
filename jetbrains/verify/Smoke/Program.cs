@@ -9,7 +9,7 @@ using ModelContextProtocol.Server;
 // Smoke test of the JetBrains fork of ModelContextProtocol.Core under System.Text.Json 8.
 //   json                  enum wire names through McpJsonUtilities.DefaultOptions
 //   server                stdio MCP server built on the fork
-//   stdio <host-command>  client: starts this assembly's server mode through <host-command> and talks to it
+//   stdio <host-command>  client: starts this assembly's server mode through <host-command> and talks to it; "direct" starts the executable itself, as .NET Framework runs it
 //   http <url> <mode>     client: talks to an MCP server over HTTP, mode StreamableHttp or Sse
 int failures = 0;
 void Check(bool isOk, string what)
@@ -62,7 +62,8 @@ switch(args[0])
 
     case "stdio":
         string self = typeof(Program).Assembly.Location;
-        var transport = new StdioClientTransport(new StdioClientTransportOptions { Name = "fork-smoke", Command = args[1], Arguments = [self, "server"] });
+        bool isDirect = args[1] == "direct";
+        var transport = new StdioClientTransport(new StdioClientTransportOptions { Name = "fork-smoke", Command = isDirect ? self : args[1], Arguments = isDirect ? ["server"] : [self, "server"] });
         await using(McpClient client = await McpClient.CreateAsync(transport))
         {
             Check(client.ServerInfo.Name == "fork-smoke", $"initialize over stdio, server {client.ServerInfo.Name}, protocol {client.NegotiatedProtocolVersion}");
