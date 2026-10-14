@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- net8.0 runs on the inbox System.Text.Json of whichever .NET hosts it; net472 takes the packages' netfx assets, as the main solution's netfx flavor does. -->
+    <TargetFrameworks>net8.0;net472</TargetFrameworks>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Floating, so it takes whatever version jetbrains/build.sh packed last; the fork feed is the only source of this id. -->
+    <PackageReference Include="JetBrains.ModelContextProtocol.Core" Version="*" />
+  </ItemGroup>
+</Project>

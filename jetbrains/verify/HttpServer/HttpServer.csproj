@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- The official, unpatched SDK of the same version, as the far end the fork's HTTP client must interoperate with. -->
+    <PackageReference Include="ModelContextProtocol.AspNetCore" Version="$(JbUpstreamVersion)" />
+  </ItemGroup>
+</Project>

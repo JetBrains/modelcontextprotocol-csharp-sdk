@@ -1,0 +1,10 @@
+<Project>
+  <!-- Stops the walk up to the upstream Directory.Build.props: these projects consume the fork as a package, like the main solution does. -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- The checks exercise the Logging and Sampling surface on purpose, deprecated by SEP-2577 or not. -->
+    <NoWarn>$(NoWarn);MCP9004;MCP9005;MCP9006</NoWarn>
+  </PropertyGroup>
+</Project>

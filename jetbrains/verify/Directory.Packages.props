@@ -1,0 +1,6 @@
+<Project>
+  <!-- Stops the walk up to the upstream central package versions; each project here states its own. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>
