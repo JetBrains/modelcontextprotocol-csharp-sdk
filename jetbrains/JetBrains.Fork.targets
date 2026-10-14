@@ -61,6 +61,8 @@
     <!-- Every System.Net.ServerSentEvents version needs Microsoft.Bcl.AsyncInterfaces 9 or newer, so the parser is compiled in from source instead. -->
     <PackageReference Remove="System.Net.ServerSentEvents" />
     <Compile Include="$(JbForkDir)Vendored\System.Net.ServerSentEvents\*.cs" Link="JetBrains\Vendored\%(Filename)%(Extension)" />
+    <!-- Stand-ins for APIs of newer package versions than the lock has; each file says which. -->
+    <Compile Include="$(JbForkDir)Polyfills\**\*.cs" Link="JetBrains\Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(JbIsLockedProject)' == 'true'">
