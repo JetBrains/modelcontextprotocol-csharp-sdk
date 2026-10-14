@@ -63,6 +63,8 @@
     <Compile Include="$(JbForkDir)Vendored\System.Net.ServerSentEvents\*.cs" Link="JetBrains\Vendored\%(Filename)%(Extension)" />
     <!-- Stand-ins for APIs of newer package versions than the lock has; each file says which. -->
     <Compile Include="$(JbForkDir)Polyfills\**\*.cs" Link="JetBrains\Polyfills\%(RecursiveDir)%(Filename)%(Extension)" />
+    <!-- Fork-owned parts of upstream types, and stand-ins which upstream code binds to in place of the real types; each file says why. -->
+    <Compile Include="$(JbForkDir)Shims\**\*.cs" Link="JetBrains\Shims\%(RecursiveDir)%(Filename)%(Extension)" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(JbIsLockedProject)' == 'true'">
