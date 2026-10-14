@@ -3,25 +3,46 @@
 Builds `ModelContextProtocol.Core` as one netstandard2.0 asset, against the package versions of the JetBrains main solution (`DevKit/Config/MainSolutionPackageVersions.xml`), and packs it as `JetBrains.ModelContextProtocol.Core`.
 The one asset serves the main solution's netfx and netcore flavors alike.
 
-Everything the fork changes lives in this folder.
+Everything the fork changes lives in this folder, apart from one file upstream does not have: `.github/workflows/jetbrains.yml`.
 No upstream file is edited, so an upstream merge cannot conflict with the fork.
 When upstream code changes in a way the overlay no longer fits, the fork build fails; it does not drift silently.
 
 ## Use
 
 ```
-jetbrains/build.sh all <monorepo>/dotnet/DevKit/Config/MainSolutionPackageVersions.xml [-p:JbForkRevision=N]
-jetbrains/verify.sh <dotnet-8-host> <dotnet-10-host> <mono-host>
+jetbrains/build.sh all [-p:JbForkRevision=N]
+jetbrains/verify.sh <host>...    # dotnet, another dotnet command, mono, or direct for the netfx executable itself
 ```
 
+- Nothing needs to be installed but Bash, which on Windows is Git Bash.
+  `verify.sh` also needs `timeout` of GNU coreutils, and `snapshot-lock.sh` Bash 4 or newer; Linux and Git Bash have both, stock macOS neither: Homebrew `bash` gives the one, and Homebrew `coreutils` the other once its `libexec/gnubin` is on `PATH`, since it otherwise names it `gtimeout`.
+  Unless `JB_DOTNET` names a dotnet, the scripts run themselves under `dotnet-sdk.cmd`, which downloads its pinned SDK once into the user profile.
+  That file is a verbatim copy of `dotnet/DevKit/Scripts/dotnet-sdk.cmd` of the JetBrains monorepo, at its commit b85cdc8809fa7; it pins SDK 10.0.401.
 - `build.sh` packs into `artifacts/jetbrains/packages`.
   To sign the assemblies, run its `build` step, sign `artifacts/jetbrains/bin/**/*.dll` in place, then run its `pack` step, which packs without building again.
 - The package version is stable and has four nonzero components: upstream major, upstream minor, upstream patch plus one, and `JbForkRevision`. So upstream 2.2.0 gives 2.2.1.1 on the first fork build.
   The build refuses a version that breaks that rule.
-  Bump `JbForkRevision` on every rebuild from a different commit, because upstream does not always bump `VersionPrefix`.
+  Bump `JbForkRevision` on every rebuild from a different commit, because upstream does not always bump `VersionPrefix`; a CI build counter does.
 - The assembly version stays upstream's, so the assembly binds wherever the upstream one would; the file version carries the package version.
 - Package validation compares each build against the upstream package of the same version, so a public API removal fails the build.
 - `verify.sh` runs the checks in `verify/Smoke` on each host: enum wire names, a stdio client against the fork's own stdio server, and an HTTP client against the upstream ASP.NET Core server over Streamable HTTP and over legacy SSE.
+  The bootstrapped SDK has the .NET 10 runtime only; pass another dotnet command to check on .NET 8, and `DOTNET_ROLL_FORWARD=LatestMajor` runs the net8.0 build on the newest .NET a host has.
+  On Windows, `direct` means .NET Framework.
+
+## The lock
+
+Every build uses `lock/MainSolutionPackageVersions.subset.xml`: the main solution lock entries of only the packages this build resolves, verbatim.
+Pinning acts only on packages in the restore graph, so it resolves exactly what the full lock does; a build against either gives an identical nuspec.
+Committed, it ties each fork revision to one set of versions, whatever the main solution has moved to since.
+`snapshot-lock.sh <full lock>` rewrites it from a main solution lock.
+Run it to take a lock move over, and after every upstream merge: a dependency upstream adds is pinned only once the subset has it, and goes unpinned silently until then.
+`JB_PACKAGE_LOCK` makes `build.sh` use another lock, as `snapshot-lock.sh` does.
+
+## Builds
+
+- **TeamCity**, the one that signs, runs `build.sh build`, the code signing step on `artifacts/jetbrains/bin`, then `build.sh pack`, with the build counter as `JbForkRevision`.
+- **GitHub Actions** (`.github/workflows/jetbrains.yml`) runs on pushes and pull requests to the `jetbrains` branch, on Linux and Windows.
+  It builds, runs the checks on .NET 10, and on .NET Framework on Windows, and uploads the unsigned package.
 
 ## How it hooks in
 
@@ -60,6 +81,7 @@ Restore fails with NU1109 if any dependency needs more than the lock has.
 ## Merging upstream
 
 1. Merge or rebase onto the new upstream commit; there is nothing to conflict.
-2. Run `build.sh all` with a bumped `JbForkRevision`. A compile error inside a `Shims` or `Polyfills` file means upstream now uses a member the stand-in lacks; extend the stand-in.
-3. Run `verify.sh` on .NET 8, .NET 10 and mono or .NET Framework.
-4. Re-check the table: when the lock has moved, drop the rows it obsoletes.
+2. Run `snapshot-lock.sh` against the current main solution lock, and commit the subset if it changed.
+3. Run `build.sh all`. A compile error inside a `Shims` or `Polyfills` file means upstream now uses a member the stand-in lacks; extend the stand-in.
+4. Run `verify.sh` on .NET 10 and on .NET Framework or mono, or let GitHub Actions do it.
+5. Re-check the table: when the lock has moved, drop the rows it obsoletes.
