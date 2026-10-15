@@ -57,7 +57,7 @@ Restore fails with NU1109 if any dependency needs more than the lock has.
 
 | Change | Why | Remove when |
 |---|---|---|
-| `LockAdditions.props`: Microsoft.Extensions.AI.Abstractions 9.10.0 | Not in the lock; 9.10.0 is the version the JetBrains build feed carries, and its netstandard2.0 dependencies are only System.Text.Json >= 8.0.6. The package then declares this version as its minimum, and a lock below it fails the restore of every consumer with NU1109. | The lock has it. |
+| `LockAdditions.props`: Microsoft.Extensions.AI.Abstractions 9.10.2 | Not in the lock; 9.10.2 is the newest version whose netstandard2.0 dependencies are only System.Text.Json >= 8.0.6. Must be added to the lock before consuming the fork. | The lock has it. |
 | `Vendored/System.Net.ServerSentEvents` | Every package version needs Microsoft.Bcl.AsyncInterfaces >= 9; the lock has 8.0.0. The parser is compiled in from dotnet/runtime v10.0.0; see its README. | The lock has Microsoft.Bcl.AsyncInterfaces >= 9; add the package to the lock instead. |
 | `Polyfills/.../JsonStringEnumMemberNameAttribute.cs`, `Polyfills/JsonStringEnumConverter.cs` | System.Text.Json 8 lacks the attribute, and would write `"User"` where MCP wants `"user"`. The converter types shadow System.Text.Json's for the whole assembly by namespace lookup; see the file. | The lock has System.Text.Json >= 9. |
 | `Polyfills/.../InstrumentAdvice.cs` | DiagnosticSource 8 lacks `InstrumentAdvice<T>`; histograms lose their explicit bucket boundaries. | The lock has System.Diagnostics.DiagnosticSource >= 9. |
