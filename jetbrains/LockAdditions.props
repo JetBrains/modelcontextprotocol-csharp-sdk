@@ -5,7 +5,7 @@
     Only versions whose dependencies are already satisfied by the lock are acceptable here.
   -->
   <ItemGroup>
-    <!-- Newest version whose netstandard2.0 dependencies are just System.Text.Json >= 8.0.6; 10.x requires System.Text.Json 10. -->
-    <PackageLock Include="Microsoft.Extensions.AI.Abstractions" Version="9.10.2" />
+    <!-- The version the JetBrains build feed carries, which the main solution can lock; 9.10.2 has the same netstandard2.0 dependencies (just System.Text.Json >= 8.0.6) and the same assembly version 9.10.0.0, but the feed lacks it. 10.x requires System.Text.Json 10. -->
+    <PackageLock Include="Microsoft.Extensions.AI.Abstractions" Version="9.10.0" />
   </ItemGroup>
 </Project>
