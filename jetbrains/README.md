@@ -20,8 +20,8 @@ jetbrains/verify.sh <host>...    # dotnet, another dotnet command, mono, or dire
   That file is a verbatim copy of `dotnet/DevKit/Scripts/dotnet-sdk.cmd` of the JetBrains monorepo, at its commit b85cdc8809fa7; it pins SDK 10.0.401.
 - `build.sh` packs into `artifacts/jetbrains/packages`.
   To sign the assemblies, run its `build` step, sign `artifacts/jetbrains/bin/**/*.dll` in place, then run its `pack` step, which packs without building again.
-- The package version is stable and has four nonzero components: upstream major, upstream minor, upstream patch plus one, and `JbForkRevision`. So upstream 2.2.0 gives 2.2.1.1 on the first fork build.
-  The build refuses a version that breaks that rule.
+- The package version is stable and has four components: upstream major, upstream minor, upstream patch, and `JbForkRevision`. So upstream 2.2.0 gives 2.2.0.1 on the first fork build.
+  The build refuses a version without a nonzero fork revision.
   Bump `JbForkRevision` on every rebuild from a different commit, because upstream does not always bump `VersionPrefix`; a CI build counter does.
 - The assembly version stays upstream's, so the assembly binds wherever the upstream one would; the file version carries the package version.
 - Package validation compares each build against the upstream package of the same version, so a public API removal fails the build.

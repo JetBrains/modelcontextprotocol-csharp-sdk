@@ -38,9 +38,8 @@
     <JbUpstreamPackageId>$(PackageId)</JbUpstreamPackageId>
     <PackageId>JetBrains.$(JbUpstreamPackageId)</PackageId>
     <JbForkRevision Condition="'$(JbForkRevision)' == ''">1</JbForkRevision>
-    <!-- A stable version, as a prerelease cannot be a dependency of a release package, with four components that are all nonzero, since NuGet normalizes a zero away in some places and not others. -->
-    <!-- Major and minor are upstream's; the third is upstream's patch plus one, so a .0 release stays nonzero; the fourth is the fork revision. -->
-    <PackageVersion>$([System.Version]::Parse('$(VersionPrefix)').Major).$([System.Version]::Parse('$(VersionPrefix)').Minor).$([MSBuild]::Add($([System.Version]::Parse('$(VersionPrefix)').Build), 1)).$(JbForkRevision)</PackageVersion>
+    <!-- Keep the upstream major.minor.patch and append the nonzero fork revision as the fourth component. -->
+    <PackageVersion>$([System.Version]::Parse('$(VersionPrefix)').Major).$([System.Version]::Parse('$(VersionPrefix)').Minor).$([System.Version]::Parse('$(VersionPrefix)').Build).$(JbForkRevision)</PackageVersion>
     <!-- The assembly version stays upstream's, so the assembly binds where the upstream one would; the file version tells the builds apart. -->
     <FileVersion>$(PackageVersion)</FileVersion>
     <!-- Package validation compares against the upstream package of the same version, so every fork build doubles as an API diff against it. -->
@@ -74,6 +73,6 @@
   </ItemGroup>
 
   <Target Name="JbCheckPackageVersion" BeforeTargets="GenerateNuspec" Condition="('$(JbIsLockedProject)' == 'true') and ('$(IsPackable)' == 'true')">
-    <Error Condition="$(PackageVersion.Split('.').Length) != 4 or $(PackageVersion.Contains('-')) or $(PackageVersion.StartsWith('0.')) or $(PackageVersion.Contains('.0.')) or $(PackageVersion.EndsWith('.0'))" Text="The fork package version $(PackageVersion), made from upstream $(VersionPrefix), must be stable and have four nonzero components." />
+    <Error Condition="$(PackageVersion.Split('.').Length) != 4 or $(PackageVersion.Contains('-')) or $(PackageVersion.StartsWith('0.')) or $(PackageVersion.EndsWith('.0'))" Text="The fork package version $(PackageVersion), made from upstream $(VersionPrefix), must be stable, have four components, and have a nonzero fork revision." />
   </Target>
 </Project>
