@@ -1,11 +1,11 @@
 <Project>
   <!--
-    Packages the fork needs that the main solution lock does not list yet.
-    Each one must be added to MainSolutionPackageVersions.xml at exactly this version before the fork package is consumed.
-    Only versions whose dependencies are already satisfied by the lock are acceptable here.
+    Packages the fork needs that are not part of the main solution lock.
+    Every package here must be available from the configured package sources at the exact version.
+    Only versions whose dependencies are already satisfied by the main solution lock are acceptable here.
   -->
   <ItemGroup>
-    <!-- Newest version whose netstandard2.0 dependencies are just System.Text.Json >= 8.0.6; 10.x requires System.Text.Json 10. -->
-    <PackageLock Include="Microsoft.Extensions.AI.Abstractions" Version="9.10.2" />
+    <!-- Published JetBrains repack of MEAI 9.10.2 without the net9.0 asset. -->
+    <PackageLock Include="JetBrains.Microsoft.Extensions.AI.Abstractions" Version="9.10.2.5" />
   </ItemGroup>
 </Project>

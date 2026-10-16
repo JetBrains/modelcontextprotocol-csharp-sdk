@@ -31,17 +31,18 @@ jetbrains/verify.sh <host>...    # dotnet, another dotnet command, mono, or dire
 
 ## The lock
 
-Every build uses `lock/MainSolutionPackageVersions.subset.xml`: the main solution lock entries of only the packages this build resolves, verbatim.
-Pinning acts only on packages in the restore graph, so it resolves exactly what the full lock does; a build against either gives an identical nuspec.
-Committed, it ties each fork revision to one set of versions, whatever the main solution has moved to since.
+Every build uses `lock/MainSolutionPackageVersions.subset.xml`: the main solution lock entries of only the packages this build resolves, verbatim. `LockAdditions.props` adds the separately published `JetBrains.Microsoft.Extensions.AI.Abstractions` 9.10.2.5 package, resolved from the JetBrains dotnet build feed configured in `nuget.config`.
+Pinning acts only on packages in the restore graph, so the main solution dependencies resolve exactly as the full lock does; a build against either gives an identical nuspec.
+Committed, the subset ties each fork revision to one set of versions, whatever the main solution has moved to since.
 `snapshot-lock.sh <full lock>` rewrites it from a main solution lock.
 Run it to take a lock move over, and after every upstream merge: a dependency upstream adds is pinned only once the subset has it, and goes unpinned silently until then.
 `JB_PACKAGE_LOCK` makes `build.sh` use another lock, as `snapshot-lock.sh` does.
+The JetBrains feed uses the `dotnet_build_space` source, so a build outside TeamCity must provide `NuGetPackageSourceCredentials_dotnet_build_space` with that feed's read credentials.
 
 ## Builds
 
-- **TeamCity**, the one that signs, runs `build.sh build`, the code signing step on `artifacts/jetbrains/bin`, then `build.sh pack`, with the build counter as `JbForkRevision`.
-- **GitHub Actions** (`.github/workflows/jetbrains.yml`) runs on pushes and pull requests to the `jetbrains` branch, on Linux and Windows.
+- **TeamCity**, the one that signs, runs `build.sh build`, the code signing step on `artifacts/jetbrains/bin`, then `build.sh pack`, with the build counter as `JbForkRevision`. It injects read credentials for the JetBrains package feed.
+- **GitHub Actions** (`.github/workflows/jetbrains.yml`) runs on pushes and pull requests to the `jetbrains` branch, on Linux and Windows. The repository needs `NUGET_BUILD_USERNAME` and `NUGET_BUILD_TOKEN` secrets for the private JetBrains feed.
   It builds, runs the checks on .NET 10, and on .NET Framework on Windows, and uploads the unsigned package.
 
 ## How it hooks in
@@ -57,12 +58,12 @@ Restore fails with NU1109 if any dependency needs more than the lock has.
 
 | Change | Why | Remove when |
 |---|---|---|
-| `LockAdditions.props`: Microsoft.Extensions.AI.Abstractions 9.10.2 | Not in the lock; 9.10.2 is the newest version whose netstandard2.0 dependencies are only System.Text.Json >= 8.0.6. Must be added to the lock before consuming the fork. | The lock has it. |
+| `LockAdditions.props`: `JetBrains.Microsoft.Extensions.AI.Abstractions` 9.10.2.5 | Uses the repacked MEAI package without its net9.0 asset, so .NET 9 selects the net8.0 asset compatible with the main solution's System.Text.Json 8. | The main solution no longer needs the repack. |
 | `Vendored/System.Net.ServerSentEvents` | Every package version needs Microsoft.Bcl.AsyncInterfaces >= 9; the lock has 8.0.0. The parser is compiled in from dotnet/runtime v10.0.0; see its README. | The lock has Microsoft.Bcl.AsyncInterfaces >= 9; add the package to the lock instead. |
 | `Polyfills/.../JsonStringEnumMemberNameAttribute.cs`, `Polyfills/JsonStringEnumConverter.cs` | System.Text.Json 8 lacks the attribute, and would write `"User"` where MCP wants `"user"`. The converter types shadow System.Text.Json's for the whole assembly by namespace lookup; see the file. | The lock has System.Text.Json >= 9. |
 | `Polyfills/.../InstrumentAdvice.cs` | DiagnosticSource 8 lacks `InstrumentAdvice<T>`; histograms lose their explicit bucket boundaries. | The lock has System.Diagnostics.DiagnosticSource >= 9. |
 | `Shims/StreamableHttpPostTransport.Logger.cs` | The `[LoggerMessage]` generator of Logging.Abstractions 8 needs an `ILogger` field, not a primary constructor parameter. | The lock has Microsoft.Extensions.Logging.Abstractions >= 9. |
-| `Shims/AIFunctionFactoryOptions.cs` | The init accessors of `ParameterBindingOptions` bind to a different `IsExternalInit` in the netstandard2.0 asset of Microsoft.Extensions.AI.Abstractions than in its net8.0 asset, which forwards none. So the netstandard2.0 build throws `MissingMethodException` on .NET 8+ wherever the net8.0 asset is deployed. | Microsoft.Extensions.AI.Abstractions forwards `IsExternalInit` in its net8.0 asset, or the main solution deploys a single asset of it for both runtimes. |
+| `Shims/AIFunctionFactoryOptions.cs` | The init accessors of `ParameterBindingOptions` bind to a different `IsExternalInit` in the netstandard2.0 asset of the MEAI assembly than in its net8.0 asset, which forwards none. So the netstandard2.0 build throws `MissingMethodException` on .NET 8+ wherever the net8.0 asset is deployed. | The MEAI assembly forwards `IsExternalInit` in its net8.0 asset, or the main solution deploys a single asset of it for both runtimes. |
 | `PackageReference Remove="Microsoft.SourceLink.GitHub"` | Source Link 10 drags System.IO.Hashing 10 past the lock; the .NET 8+ SDK has Source Link built in. | Never needed back. |
 | `NoWarn CS1574` | Upstream doc comments cref System.Text.Json 9 members. | The lock has System.Text.Json >= 9. |
 | `NuGetAuditSuppress` CVE-2026-26127 | The lock's Microsoft.Bcl.Memory 9.0.0 is vulnerable; 9.0.14 fixes it. | The lock moves to 9.0.14 or newer. |

@@ -29,6 +29,17 @@ jobs:
         shell: bash
 
     steps:
+    - name: 🔐 Configure the JetBrains NuGet feed credentials
+      env:
+        NUGET_BUILD_USERNAME: ${{ secrets.NUGET_BUILD_USERNAME }}
+        NUGET_BUILD_TOKEN: ${{ secrets.NUGET_BUILD_TOKEN }}
+      run: |
+        if [[ -z "$NUGET_BUILD_USERNAME" || -z "$NUGET_BUILD_TOKEN" ]]; then
+          echo "Set the NUGET_BUILD_USERNAME and NUGET_BUILD_TOKEN repository secrets to access the JetBrains package feed." >&2
+          exit 1
+        fi
+        echo "NuGetPackageSourceCredentials_dotnet_build_space=Username=$NUGET_BUILD_USERNAME;Password=$NUGET_BUILD_TOKEN" >> "$GITHUB_ENV"
+
     - name: 📥 Clone the repo
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
